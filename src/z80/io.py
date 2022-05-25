@@ -17,7 +17,7 @@ class Interruptable(object):
         pass
     
 class Console(QTextEdit, IO):
-    _addresses = [0x80, 0x81]
+    _addresses = [0x00, 0x01]
     _wrt_sgnl = Signal(int, int)
     def __init__(self, interruptable):
         #assert isinstance(interruptable, Interruptable )
@@ -37,17 +37,15 @@ class Console(QTextEdit, IO):
         
     def read(self, address):
         print ("READ ", address)
-        if address == 0x80:
-            v =  ((1 << 1) | # RTS
-                  ((self._send_queue is not None) << 0) | # interrupt?
-                  0 )
-            return v
-        elif address == 0x81:
+        # Sono invertiti? Per colpa dell'emulatore?
+        if address == 0x01:
+            pass
+        elif address == 0x00:
             if self._send_queue is not None:
                 val = self._send_queue
                 self._send_queue = None
                 return val
-        return 0x13
+        return 0x0
     
     
     @Slot(int, int)
@@ -56,15 +54,10 @@ class Console(QTextEdit, IO):
         self._wrt_sgnl.emit(address, value)
         
     def _write(self, address, value):
-        if address == 0x80:
+        if address == 0x01:
             pass
-        elif address == 0x81:
-            if value <  128 and value > 10:
-                self.setText(self.toPlainText()+chr(value))
-            else:
-                self.setText(self.toPlainText()+".")
-        else:
-            raise Exception("Trying Console IO with wrong address")
+        elif address == 0x0:
+            self.setText(self.toPlainText()+chr(value))
         
     def keyPressEvent(self, event):
 #        print ("Event:", event)
