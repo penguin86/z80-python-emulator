@@ -1,3 +1,6 @@
+#!/usr/bin/env python3
+
+import argparse
 from z80 import util, io, gui, registers, instructions
 
 import copy
@@ -13,11 +16,16 @@ import threading
 #logging.basicConfig(level=logging.INFO)
 
 class Z80SBC(io.Interruptable):
-    def __init__(self):
+    def __init__(self, rom, romIsBinary):
         self.registers = registers.Registers()
         self.instructions = instructions.InstructionSet(self.registers)
         self._memory = bytearray(64*1024)
-        self._read_rom("../roms/ROM.HEX")
+
+        if romIsBinary:
+            self._read_bin_rom(rom)
+        else:
+            self._read_rom(rom)
+        
         self._iomap = io.IOMap()
         self._console = io.Console(self)
         self._reg_gui = gui.RegistersGUI(self.registers)
@@ -50,6 +58,15 @@ class Z80SBC(io.Interruptable):
                 for b in range(count):
                     byte =  int(line[pos+(2*b):pos+(2*b)+2], 16) #. decode("hex")
                     self._memory[address+b] = byte
+    def _read_bin_rom(self, romfile):
+        with open(romfile, "rb") as f:
+            i = 0
+            while 1:
+                byte_s = f.read(1)
+                if not byte_s:
+                    break
+                self._memory[i] = byte_s[0]
+                i = i + 1
     
     def step_instruction(self):
         ins, args = False, []
@@ -83,8 +100,11 @@ class Z80SBC(io.Interruptable):
 
             if i[0] > 0x10000:
                 address = i[0] & 0xFF
-                #iomap.address[address].write.emit(address, i[1])
-                self._iomap.address[address].write(address, i[1])
+                try:
+                    #iomap.address[address].write.emit(address, i[1])
+                    self._iomap.address[address].write(address, i[1])
+                except KeyError:
+                    print ("Error: output device not found at ", address)
                 #print (chr(i[1]))
             else:
                 self._memory[i[0]] = i[1]
@@ -95,8 +115,14 @@ class Z80SBC(io.Interruptable):
 if __name__ == '__main__':
     ''' Main Program '''
     qt_app = QApplication(sys.argv)
+
+    # Parse command line args
+    parser = argparse.ArgumentParser()
+    parser.add_argument('rom', help="rom file path")
+    parser.add_argument('-b', '--binary', action='store_true', help="loads the rom as binary instead of hex")
+    args = parser.parse_args()
     
-    mach = Z80SBC()
+    mach = Z80SBC(args.rom, args.binary)
     def worker():
         t = time()
              
